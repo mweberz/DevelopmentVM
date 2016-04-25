@@ -1,0 +1,180 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"vmName": {
+			"type": "string"
+		},
+		"adminUsername": {
+			"type": "string"
+		},
+		"adminPassword": {
+			"type": "securestring"
+		},
+		"location": {
+			"type": "string",
+			"defaultValue": "North Europe"
+		}
+	},
+	"variables": {
+		"vmSize": "Standard_D2",
+		"storageAccountType": "Standard_LRS",
+		"groupName": "lensorderdbvm",
+		"virtualNetworkName": "vnet",
+		"subnetName": "subnet",
+		"nicName": "nic",
+		"loadBalancerName": "loadbalancer",
+		"publicIpName": "publicip",
+		"vnetID": "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]",
+		"subnetRef": "[concat(variables('vnetID'),'/subnets/',variables ('subnetName'))]",
+		"publicIPAddressID": "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPName'))]",
+		"lbID": "[resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerName'))]",
+		"frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/loadBalancerFrontEnd')]",
+		"userImageStorageContainerName": "images",
+		"userImageVhdName":"devbox.vhd",
+		"userImageName": "[concat('http://',variables('groupName'),'.blob.core.windows.net/',variables('userImageStorageContainerName'),'/',variables('userImageVhdName'))]"
+	},
+	"resources": [
+	{
+		"apiVersion": "2015-05-01-preview",
+		"type": "Microsoft.Network/virtualNetworks",
+		"name": "[variables('virtualNetworkName')]",
+		"location": "[parameters('location')]",
+		"tags": {
+			"displayName": "Virtual Network"
+		},
+		"properties": {
+			"addressSpace": {
+				"addressPrefixes": ["10.0.0.0/16"]
+			},
+			"subnets": [{
+				"name": "[variables('subnetName')]",
+				"properties": {
+					"addressPrefix": "10.0.1.0/24"
+				}
+			}]
+		}
+	},
+	{
+		"apiVersion": "2015-05-01-preview",
+		"type": "Microsoft.Network/networkInterfaces",
+		"name": "[variables('nicName')]",
+		"location": "[parameters('location')]",
+		"tags": {
+			"displayName": "Network Interface"
+		},
+		"dependsOn": [
+			"[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+			"[concat('Microsoft.Network/loadBalancers/', variables('loadBalancerName'))]"
+		],
+		"properties": {
+			"ipConfigurations": [{
+				"name": "ipconfig",
+				"properties": {
+					"privateIPAllocationMethod": "Dynamic",
+					"subnet": {
+						"id": "[variables('subnetRef')]"
+					},
+					"loadBalancerBackendAddressPools": [{
+						"id": "[concat(variables('lbID'), '/backendAddressPools/backendPool')]"
+					}],
+					"loadBalancerInboundNatRules": [{
+						"id": "[concat(variables('lbID'),'/inboundNatRules/rdp')]"
+					}]
+				}
+			}]
+		}
+	},
+	{
+		"apiVersion": "2015-05-01-preview",
+		"type": "Microsoft.Network/loadBalancers",
+		"name": "[variables('loadBalancerName')]",
+		"location": "[parameters('location')]",
+		"tags": {
+			"displayName": "Load Balancer"
+		},
+		"dependsOn": [
+			"[variables('vnetID')]",
+			"[concat('Microsoft.Network/publicIPAddresses/', variables('publicIpName'))]"
+		],
+		"properties": {
+			"frontendIPConfigurations": [{
+				"name": "LoadBalancerFrontend",
+				"properties": {
+					"publicIPAddress": {
+						"id": "[variables('publicIPAddressID')]"
+					}
+				}
+			}],
+			"backendAddressPools": [{
+				"name": "backendPool"
+			}],
+			"inboundNatRules": [{
+				"name": "rdp",
+				"properties": {
+					"frontendIPConfiguration": {
+						"id": "[variables('frontEndIPConfigID')]"
+					},
+					"protocol": "tcp",
+					"frontendPort": 3389,
+					"backendPort": 3389,
+					"enableFloatingIP": false
+				}
+			}]
+		}
+	},
+	{
+		"name": "[variables('publicIpName')]",
+		"type": "Microsoft.Network/publicIPAddresses",
+		"location": "[parameters('location')]",
+		"apiVersion": "2015-05-01-preview",
+		"dependsOn": [],
+		"tags": {
+			"displayName": "Public IP"
+		},
+		"properties": {
+			"publicIPAllocationMethod": "Dynamic"
+		}
+	},
+	{
+		"apiVersion": "2015-05-01-preview",
+		"type": "Microsoft.Compute/virtualMachines",
+		"name": "[parameters('vmName')]",
+		"location": "[parameters('location')]",
+		"tags": {
+			"displayName": "Virtual Machine"
+		},
+		"dependsOn": [
+			"[concat('Microsoft.Network/networkInterfaces/', variables('nicName'))]"
+		],
+		"properties": {
+			"hardwareProfile": {
+				"vmSize": "[variables('vmSize')]"
+			},
+			"osProfile": {
+				"computerName": "[parameters('vmName')]",
+				"adminUsername": "[parameters('adminUsername')]",
+				"adminPassword": "[parameters('adminPassword')]"
+			},
+			"storageProfile": {
+				"osDisk": {
+					"name": "osdiskcustom",
+					"osType": "Windows",
+					"image": {
+					  "uri": "[variables('userImageName')]"
+					},
+					"vhd": {
+					  "uri": "[concat('http://',parameters('sandboxName'),'.blob.core.windows.net/vhds/osDisk-',reference(resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerName'))).resourceGuid,'.vhd')]"
+					},
+					"caching": "ReadWrite",
+					"createOption": "FromImage"
+				}
+			},
+			"networkProfile": {
+				"networkInterfaces": [{
+					"id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
+				}]
+			}
+		}
+	}]
+}

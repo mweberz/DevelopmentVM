@@ -11,9 +11,6 @@
 		"adminPassword": {
 			"type": "securestring"
 		},
-		"groupName": {
-			"type": "string"
-		},
 		"location": {
 			"type": "string",
 			"defaultValue": "North Europe"

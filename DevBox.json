@@ -11,6 +11,9 @@
 		"adminPassword": {
 			"type": "securestring"
 		},
+		"groupName": {
+			"type": "string"
+		},
 		"location": {
 			"type": "string",
 			"defaultValue": "North Europe"
@@ -19,7 +22,7 @@
 	"variables": {
 		"vmSize": "Standard_D2",
 		"storageAccountType": "Standard_LRS",
-		"groupName": "lensorderdbvm",
+		"storageAccountName": "lensorderdbvm",
 		"virtualNetworkName": "vnet",
 		"subnetName": "subnet",
 		"nicName": "nic",
@@ -32,7 +35,7 @@
 		"frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/loadBalancerFrontEnd')]",
 		"userImageStorageContainerName": "images",
 		"userImageVhdName":"devbox.vhd",
-		"userImageName": "[concat('http://',variables('groupName'),'.blob.core.windows.net/',variables('userImageStorageContainerName'),'/',variables('userImageVhdName'))]"
+		"userImageName": "[concat('http://',variables('storageAccountName'),'.blob.core.windows.net/',variables('userImageStorageContainerName'),'/',variables('userImageVhdName'))]"
 	},
 	"resources": [
 	{
@@ -164,7 +167,7 @@
 					  "uri": "[variables('userImageName')]"
 					},
 					"vhd": {
-					  "uri": "[concat('http://',parameters('groupName'),'.blob.core.windows.net/vhds/osDisk-',reference(resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerName'))).resourceGuid,'.vhd')]"
+					  "uri": "[concat('http://',parameters('storageAccountName'),'.blob.core.windows.net/vhds/osDisk-',reference(resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerName'))).resourceGuid,'.vhd')]"
 					},
 					"caching": "ReadWrite",
 					"createOption": "FromImage"
